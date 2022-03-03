@@ -1,9 +1,16 @@
 # Load the packages
-library(biotools)
-library(MVN)
-library(ggplot2)
-library(GGally)
-library(psych)
+library(biotools) # Used to train the lda model
+library(MVN) # Used to the multivariate normality tests
+library(ggplot2) # Used to create our plots
+library(GGally) # Used to create the pair plot
+library(ggExtra) # Used for the marginal plots
+library(caret) # Used to evaluate model
+
+# Set the  base theme for ggplot2
+theme_set(theme_classic(base_size = 14))
+
+# Set a seed so that our train/test sets stay the same
+set.seed(1234)
 
 # Load the dataset
 df <- read.csv("./Datasets/penguins_size.csv")
@@ -13,7 +20,9 @@ df <- subset(df, select = -c(island, sex))
 colnames(df) <- c("Art", "Culmenlängd", "Culmendjup", "Vinglängd", "Vikt")
 
 # We find that we have two missing values in each of the independent variables
-summary(df)
+summary(df[df$Art == "Gentoo", ])
+summary(df[df$Art == "Chinstrap", ])
+summary(df[df$Art == "Adelie", ])
 
 # We also find that the missing values are connected to two observations
 df[is.na(df$Culmenlängd), ]
@@ -22,17 +31,40 @@ df[is.na(df$Culmenlängd), ]
 # just remove the two observations.
 df <- df[!is.na(df$Culmenlängd), ]
 
+# The standard deviations of our variables are
+round(sapply(df[df$Art == "Gentoo", ][2:5], mean), 1)
+round(sapply(df[df$Art == "Gentoo", ][2:5], sd), 1)
+
+round(sapply(df[df$Art == "Chinstrap", ][2:5], mean), 1)
+round(sapply(df[df$Art == "Chinstrap", ][2:5], sd), 1)
+
+round(sapply(df[df$Art == "Adelie", ][2:5], mean), 1)
+round(sapply(df[df$Art == "Adelie", ][2:5], sd), 1)
+
+round(sapply(df[2:5], mean), 1)
+round(sapply(df[2:5], sd), 1)
+
+# Frequency plot
+ggplot(data = df, aes(x = Art, fill = Art)) +
+  geom_bar() +
+  ylab("Antal") +
+  labs(title=paste("Antal pingviner (n=", nrow(df), ")", sep="")) +
+  geom_text(aes(label=paste(..count.., " (", round(..count../nrow(df)*100, 1), "%)", sep="")), 
+            stat="count", nudge_y = 4) +
+  theme(legend.position = "none")
+ggsave(filename = "freq_plot.png", path = "./Plots", 
+       height = 5, width = 5)
+
 # Split into train and test sets
-perc_train <- 0.9
+perc_train <- 0.7
 split <- sample(c(rep(0, perc_train * nrow(df)), rep(1, (1-perc_train) * nrow(df))))
 train <- df[split == 0, ]   
 test <- df[split == 1, ]  
 
 # Summary plot for all independent variables
 ggpairs(df, columns = 2:5, aes(color = Art, alpha = 0.05))
-
-# Lets look at the correlations
-corPlot(df[, 2:5]) 
+ggsave(filename = "var_summary.png", path = "./Plots", 
+       height = 9, width = 9)
 
 # Assumptions for LDA
 # - Data is multivariate normally distributed
@@ -40,11 +72,13 @@ corPlot(df[, 2:5])
 
 # Lets test the assumption of normality
 # Mardia's test
-mvn(subset(df, select = -Art), mvnTest = "mardia")
+mvn(subset(df, select = -Art), mvnTest = "mardia")$multivariateNormality
 # Henze-Zirkler's test
-mvn(subset(df, select = -Art), mvnTest = "hz")
+mvn(subset(df, select = -Art), mvnTest = "hz")$multivariateNormality
 # Royston's test
-mvn(subset(df, select = -Art), mvnTest = "royston")
+mvn(subset(df, select = -Art), mvnTest = "royston")$multivariateNormality
+
+# Add these in tables on google docs.
 
 # Different univariate and multivariate plots
 mvn(subset(df, select = -Art), univariatePlot = "qqplot")
@@ -56,9 +90,9 @@ mvn(subset(df, select = -Art), multivariatePlot = "qq")
 # We will have to look at the covariance matrices manually since
 # the test for equal covariances require the data to be multivariate
 # normal.
-cov(df[df$Art == "Gentoo", ][, 2:5])
-cov(df[df$Art == "Chinstrap", ][, 2:5])
-cov(df[df$Art == "Adelie", ][, 2:5])
+round(cov(df[df$Art == "Gentoo", ][, 2:5]), 1)
+round(cov(df[df$Art == "Chinstrap", ][, 2:5]), 1)
+round(cov(df[df$Art == "Adelie", ][, 2:5]), 1)
 
 # The model is defined as 
 lda <- lda(Art ~ ., data = train)
@@ -84,30 +118,38 @@ lda_output_test <- data.frame(
   x = 0)
 
 # Plot on the test data
-ggplot(lda_output_test, aes(x = LD1, y = LD2, color=Art)) +
-  geom_point()
+lda_plot <- ggplot(lda_output_test, aes(x = LD1, y = LD2, color=Art)) +
+  geom_point(size = 4, alpha=0.6) + 
+  theme(text = element_text(family = "Lato"), legend.position = "bottom")
+ggMarginal(lda_plot, type="histogram", groupFill = TRUE, 
+           xparams = list(bins=c(25)),
+           yparams = list(bins=c(25)))
+#ggsave(filename = "lda_output_2d.png", plot = lda_plot, path = "./Plots", 
+#       height = 15, width = 15)
 
 # Lets look at the one dimensional plots
 # One dimensional plot for LD1
-ggplot(lda_output_test, aes(x=x, y=LD1, color=Art)) +
-  geom_jitter(position=position_jitter(0.2)) + 
-  xlab("") +
-  xlim(-2, 2) 
+# ggplot(lda_output_test, aes(x=x, y=LD1, color=Art)) +
+#   geom_jitter(position=position_jitter(0.2), size = 3, alpha=0.6) + 
+#   xlab("") +
+#   xlim(-2, 2)  +
+#   theme(text = element_text(family = "Lato"))
 
 # One dimensional plot for LD2
-ggplot(lda_output_test, aes(x=x, y=LD2, color=Art)) +
-  geom_jitter(position=position_jitter(0.2)) + 
-  xlab("") +
-  xlim(-2, 2) 
+# ggplot(lda_output_test, aes(x=x, y=LD2, color=Art)) +
+#   geom_jitter(position=position_jitter(0.2), size = 3, alpha=0.6) + 
+#   xlab("") +
+#   xlim(-2, 2)  +
+#   theme(text = element_text(family = "Lato"))
 
-# Where the confusion matrix is
-table(lda_output_test$Art, test$Art)
-
-# The hit rate can be calculated as
-mean(lda_output_test$Art == test$Art) # ~100%
+# We get a summary of our evaluation metrics using
+eval_metrics <- confusionMatrix(table(lda_output_test$Art, test$Art))
+eval_metrics$table # Confusion matrix
+round(eval_metrics$overall["Accuracy"]*100, 1) # Hitrate
 
 # The maximum criterion would give us a hit rate of
 max(round(prop.table(table(test$Art))*100, 1)) 
 
 # The hit rate using proportional chance criterion would b
-sum(prop.table(table(test$Art))^2) 
+round(sum(prop.table(table(test$Art))^2)*100, 1)
+
