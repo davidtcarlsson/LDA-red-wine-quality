@@ -23,7 +23,7 @@ df$species <- as.factor(df$species)
 
 ### Define colnames ####
 # Lets define the swedish and english column names that are used for our plots
-eng_colnames <- c("Species", "Culmen length", "Culmen depth", "Flipper length", "Weight")
+eng_colnames <- c("Species", "Culmenlength", "Culmendepth", "Flipperlength", "Weight")
 swe_colnames <- c("Art", "Culmenlängd", "Culmendjup", "Vinglängd", "Vikt")
 
 # For this analysis we will exclude the "island"  and "sex" variable.
@@ -99,6 +99,7 @@ round(cov(df[df$Art == "Adelie", ][, 2:5]), 1)
 # The model is defined as 
 lda <- lda(Art ~ ., data = train)
 
+
 ## Prediction outputs ####
 lda_pred_train <- predict(lda)
 lda_pred_test <- predict(lda, newdata = test)
@@ -155,8 +156,6 @@ ggMarginal(lda_plot, type="histogram", groupFill = TRUE,
 
 ### Partition plot ####
 partimat(Art ~ Culmenlängd + Vinglängd, data = df, method = "lda")
-ggsave(filename = "partition_plot.png", path = "./Plots", 
-       height = 9, width = 9)
 
 ## English ####
 colnames(df) <- eng_colnames
@@ -197,6 +196,9 @@ lda_plot <- ggplot(lda_output_test, aes(x = LD1, y = LD2, color=Species)) +
 ggMarginal(lda_plot, type="histogram", groupFill = TRUE, 
            xparams = list(bins=c(25)),
            yparams = list(bins=c(25)))
+
+### Partition plot ####
+partimat(Species ~ Culmenlength + Flipperlength, data = df, method = "lda")
 
 # Model evaluation ####
 
