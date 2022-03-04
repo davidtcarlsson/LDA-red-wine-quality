@@ -1,1 +1,1 @@
-# LDA-red-wine-quality
+# Classifying penguin species using linear discriminant analysis
