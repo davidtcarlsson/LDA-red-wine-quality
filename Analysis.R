@@ -202,6 +202,11 @@ partimat(Species ~ Culmenlength + Flipperlength, data = df, method = "lda")
 
 # Model evaluation ####
 
+# Change colnames back to swedish
+colnames(df) <- swe_colnames
+colnames(lda_output_train)[3] <- "Art"
+colnames(lda_output_test)[3] <- "Art"
+
 # We get a summary of our evaluation metrics using
 eval_metrics <- confusionMatrix(table(lda_output_test$Art, test$Art))
 eval_metrics$table # Confusion matrix
